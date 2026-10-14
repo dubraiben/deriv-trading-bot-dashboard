@@ -309,17 +309,17 @@
 
   <!-- CORE DERIV WEBSOCKET & PRICE ACTION ENGINE -->
   <script>
-    let currentSymbol = "R_75";
-    let currentGranularity = 3600; // 1h default
-    let currentTf = "1h";
+    let currentSymbol = localStorage.getItem("deriv_active_symbol") || "R_75";
+    let currentGranularity = parseInt(localStorage.getItem("deriv_active_granularity")) || 3600; // 1h default
+    let currentTf = localStorage.getItem("deriv_active_tf") || "1h";
     let candles = [];
     let ws = null;
     let audioAlerts = true;
     let lastSignalAction = "HOLD";
 
-    // TELEGRAM CONFIGURATION
-    let tgBotToken = localStorage.getItem("tg_bot_token") || "";
-    let tgChatId = localStorage.getItem("tg_chat_id") || "";
+    // TELEGRAM CONFIGURATION (Pre-linked with your verified bot)
+    let tgBotToken = localStorage.getItem("tg_bot_token") || "8539151784:AAFCpG2NYGeHZRYIAwgL1HP5mjcTKaOICgo";
+    let tgChatId = localStorage.getItem("tg_chat_id") || "7374742280";
 
     function openTelegramModal() {
       document.getElementById("tgBotTokenInput").value = tgBotToken;
@@ -445,6 +445,7 @@
 
     function changeSymbol(newSym) {
       currentSymbol = newSym;
+      try { localStorage.setItem("deriv_active_symbol", newSym); } catch(e) {}
       candles = [];
       document.getElementById("chartPrice").innerText = "Loading...";
       document.getElementById("paramEntry").innerText = "---.--";
@@ -465,6 +466,10 @@
     function changeTimeframe(tf, gran) {
       currentTf = tf;
       currentGranularity = gran;
+      try {
+        localStorage.setItem("deriv_active_tf", tf);
+        localStorage.setItem("deriv_active_granularity", gran);
+      } catch(e) {}
       candles = [];
       document.querySelectorAll('.tf-btn').forEach(btn => {
         if (btn.dataset.tf === tf) {
@@ -930,7 +935,36 @@
       if (candles.length > 0) processMarketUpdate();
     });
 
-    // Start Live Feed on Load
+    // Sync UI to locked/persisted preferences
+    function syncUIFromStorage() {
+      const symSelect = document.getElementById("symbolSelect");
+      if (symSelect) {
+        symSelect.value = currentSymbol;
+      }
+      const names = {
+        "R_75": "Volatility 75 Index",
+        "frxXAUUSD": "Gold vs US Dollar (XAU/USD)",
+        "R_100": "Volatility 100 Index",
+        "R_50": "Volatility 50 Index",
+        "R_25": "Volatility 25 Index",
+        "1HZ100V": "Vol 100 (1s) Index"
+      };
+      const symNameEl = document.getElementById("chartSymbolName");
+      if (symNameEl) {
+        symNameEl.innerText = names[currentSymbol] || currentSymbol;
+      }
+
+      document.querySelectorAll('.tf-btn').forEach(btn => {
+        if (btn.dataset.tf === currentTf) {
+          btn.className = "tf-btn px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold shadow transition";
+        } else {
+          btn.className = "tf-btn px-2.5 py-1 rounded-lg text-slate-300 hover:text-white font-semibold transition";
+        }
+      });
+    }
+
+    // Start Live Feed on Load with Persisted Preferences
+    syncUIFromStorage();
     initWebSocket();
   </script>
 </body>
