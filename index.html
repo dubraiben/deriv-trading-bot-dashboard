@@ -470,17 +470,35 @@
       initWebSocket();
     }
 
-    // WEBSOCKET CONNECTION
+    // WEBSOCKET CONNECTION WITH AUTO-FAILOVER
+    const WS_ENDPOINTS = [
+      "wss://api.derivws.com/trading/v1/options/ws/public",
+      "wss://ws.derivws.com/websockets/v3?app_id=1089",
+      "wss://frontend.binaryws.com/websockets/v3?app_id=1089"
+    ];
+    let endpointIdx = 0;
+
     function initWebSocket() {
       if (ws) {
-        try { ws.close(); } catch(e) {}
+        try {
+          ws.onclose = null;
+          ws.onerror = null;
+          ws.close();
+        } catch(e) {}
       }
 
+      const activeUrl = WS_ENDPOINTS[endpointIdx % WS_ENDPOINTS.length];
       document.getElementById("wsStatusBadge").innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> Connecting...`;
       document.getElementById("wsStatusBadge").className = "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20";
 
-      // Public Deriv WebSocket API (app_id=1089)
-      ws = new WebSocket("wss://ws.derivws.com/websockets/v3?app_id=1089");
+      try {
+        ws = new WebSocket(activeUrl);
+      } catch (err) {
+        console.warn("Failed creating WebSocket for", activeUrl, err);
+        endpointIdx++;
+        setTimeout(initWebSocket, 1500);
+        return;
+      }
 
       ws.onopen = () => {
         document.getElementById("wsStatusBadge").innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Live Streaming`;
@@ -496,6 +514,10 @@
           style: "candles",
           subscribe: 1
         }));
+      };
+
+      ws.onerror = (err) => {
+        console.warn("WebSocket error on", activeUrl);
       };
 
       ws.onmessage = (event) => {
@@ -544,7 +566,8 @@
       ws.onclose = () => {
         document.getElementById("wsStatusBadge").innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-400"></span> Reconnecting...`;
         document.getElementById("wsStatusBadge").className = "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20";
-        setTimeout(initWebSocket, 3000);
+        endpointIdx++;
+        setTimeout(initWebSocket, 2000);
       };
     }
 
