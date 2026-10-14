@@ -60,9 +60,10 @@
       <!-- CONTROLS: SYMBOL & TIMEFRAME -->
       <div class="flex flex-wrap items-center gap-2.5">
         <div class="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/80 rounded-xl p-1 text-xs">
-          <label class="text-slate-400 pl-2 font-medium">Index:</label>
+          <label class="text-slate-400 pl-2 font-medium">Asset:</label>
           <select id="symbolSelect" onchange="changeSymbol(this.value)" class="bg-transparent text-white font-semibold focus:outline-none pr-2 cursor-pointer">
             <option value="R_75" class="bg-slate-900">Volatility 75 (R_75)</option>
+            <option value="frxXAUUSD" class="bg-slate-900">Gold / USD (frxXAUUSD)</option>
             <option value="R_100" class="bg-slate-900">Volatility 100 (R_100)</option>
             <option value="R_50" class="bg-slate-900">Volatility 50 (R_50)</option>
             <option value="R_25" class="bg-slate-900">Volatility 25 (R_25)</option>
@@ -76,6 +77,11 @@
           <button onclick="changeTimeframe('15m', 900)" class="tf-btn px-2.5 py-1 rounded-lg text-slate-300 hover:text-white font-semibold transition" data-tf="15m">15m</button>
           <button onclick="changeTimeframe('1h', 3600)" class="tf-btn px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold shadow transition" data-tf="1h">1h</button>
         </div>
+
+        <!-- TELEGRAM CONFIG BUTTON -->
+        <button onclick="openTelegramModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-600/20 border border-sky-500/40 hover:bg-sky-600/30 text-sky-300 transition cursor-pointer">
+          <span>✈️</span> <span>Telegram Alerts</span>
+        </button>
 
         <!-- SOUND TOGGLE -->
         <button id="soundToggle" onclick="toggleSound()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-300 transition cursor-pointer">
@@ -260,6 +266,47 @@
 
   </div>
 
+  <!-- TELEGRAM CONFIG MODAL -->
+  <div id="telegramModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <span>✈️</span> Telegram Alert Integration
+        </h3>
+        <button onclick="closeTelegramModal()" class="text-slate-400 hover:text-white text-xl font-mono leading-none">&times;</button>
+      </div>
+
+      <p class="text-xs text-slate-400 leading-relaxed">
+        Receive instant <strong>BUY</strong> and <strong>SELL</strong> signals with exact Entry, Take Profit, and Stop Loss sent directly to your phone.
+      </p>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="text-slate-300 font-semibold block mb-1">Telegram Bot Token:</label>
+          <input type="text" id="tgBotTokenInput" placeholder="e.g. 7123456789:AAH..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-sky-500 focus:outline-none">
+          <span class="text-[11px] text-slate-500 mt-1 block">From <strong>@BotFather</strong> on Telegram (send <code>/newbot</code>)</span>
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-semibold block mb-1">Telegram Chat ID:</label>
+          <input type="text" id="tgChatIdInput" placeholder="e.g. 123456789" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-sky-500 focus:outline-none">
+          <span class="text-[11px] text-slate-500 mt-1 block">From <strong>@userinfobot</strong> on Telegram (send <code>/start</code>)</span>
+        </div>
+      </div>
+
+      <div id="tgStatusMessage" class="text-xs p-2 rounded-lg font-semibold hidden"></div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-800 gap-2">
+        <button onclick="testTelegramAlert()" class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+          Send Test Alert
+        </button>
+        <button onclick="saveTelegramConfig()" class="px-4 py-2 rounded-xl text-xs font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 shadow transition">
+          Save Settings
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- CORE DERIV WEBSOCKET & PRICE ACTION ENGINE -->
   <script>
     let currentSymbol = "R_75";
@@ -269,6 +316,104 @@
     let ws = null;
     let audioAlerts = true;
     let lastSignalAction = "HOLD";
+
+    // TELEGRAM CONFIGURATION
+    let tgBotToken = localStorage.getItem("tg_bot_token") || "";
+    let tgChatId = localStorage.getItem("tg_chat_id") || "";
+
+    function openTelegramModal() {
+      document.getElementById("tgBotTokenInput").value = tgBotToken;
+      document.getElementById("tgChatIdInput").value = tgChatId;
+      document.getElementById("telegramModal").classList.remove("hidden");
+    }
+
+    function closeTelegramModal() {
+      document.getElementById("telegramModal").classList.add("hidden");
+    }
+
+    function saveTelegramConfig() {
+      tgBotToken = document.getElementById("tgBotTokenInput").value.trim();
+      tgChatId = document.getElementById("tgChatIdInput").value.trim();
+      localStorage.setItem("tg_bot_token", tgBotToken);
+      localStorage.setItem("tg_chat_id", tgChatId);
+      
+      const st = document.getElementById("tgStatusMessage");
+      st.className = "text-xs p-2 rounded-lg font-semibold bg-emerald-500/20 text-emerald-400 block";
+      st.innerText = "✓ Telegram settings saved successfully!";
+      setTimeout(() => {
+        closeTelegramModal();
+        st.classList.add("hidden");
+      }, 1200);
+    }
+
+    async function sendTelegramAlert(action, price, tp, sl, quality, rsi, reason) {
+      if (!tgBotToken || !tgChatId) return;
+      const emoji = action === "BUY" ? "🟢 <b>STRONG BUY SIGNAL</b>" : "🔴 <b>STRONG SELL SIGNAL</b>";
+      const assetName = currentSymbol === "frxXAUUSD" ? "Gold / USD (frxXAUUSD)" : currentSymbol;
+      const text = `${emoji}
+<b>Asset:</b> ${assetName}
+<b>Timeframe:</b> ${currentTf}
+<b>Entry Price:</b> ${price.toFixed(2)}
+<b>Take Profit (+1.5R):</b> ${tp ? tp.toFixed(2) : 'N/A'}
+<b>Stop Loss (-1.0R):</b> ${sl ? sl.toFixed(2) : 'N/A'}
+<b>Market Quality:</b> ${quality}/100
+<b>RSI:</b> ${rsi.toFixed(1)}
+<b>Strategy:</b> ${reason}
+<i>Mode: Deriv Demo Trading</i>`;
+
+      const url = `https://api.telegram.org/bot${tgBotToken}/sendMessage`;
+      try {
+        await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: tgChatId,
+            text: text,
+            parse_mode: "HTML"
+          })
+        });
+      } catch (e) {
+        console.warn("Telegram dispatch error:", e);
+      }
+    }
+
+    async function testTelegramAlert() {
+      const token = document.getElementById("tgBotTokenInput").value.trim();
+      const chat = document.getElementById("tgChatIdInput").value.trim();
+      const st = document.getElementById("tgStatusMessage");
+
+      if (!token || !chat) {
+        st.className = "text-xs p-2 rounded-lg font-semibold bg-rose-500/20 text-rose-400 block";
+        st.innerText = "Please fill in both Token and Chat ID first.";
+        return;
+      }
+
+      st.className = "text-xs p-2 rounded-lg font-semibold bg-sky-500/20 text-sky-400 block";
+      st.innerText = "Sending test message to Telegram...";
+
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chat,
+            text: "🚀 <b>Deriv Adaptive Bot Connected!</b>\nTelegram trade alerts are now active for Volatility 75 & Gold (XAU/USD).",
+            parse_mode: "HTML"
+          })
+        });
+        const json = await res.json();
+        if (json.ok) {
+          st.className = "text-xs p-2 rounded-lg font-semibold bg-emerald-500/20 text-emerald-400 block";
+          st.innerText = "✓ Test message sent! Check your Telegram.";
+        } else {
+          st.className = "text-xs p-2 rounded-lg font-semibold bg-rose-500/20 text-rose-400 block";
+          st.innerText = "Error from Telegram: " + (json.description || "Invalid token or chat ID");
+        }
+      } catch(err) {
+        st.className = "text-xs p-2 rounded-lg font-semibold bg-rose-500/20 text-rose-400 block";
+        st.innerText = "Connection error: " + err.message;
+      }
+    }
 
     // AUDIO CHIME
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -302,6 +447,7 @@
       currentSymbol = newSym;
       const names = {
         "R_75": "Volatility 75 Index",
+        "frxXAUUSD": "Gold vs US Dollar (XAU/USD)",
         "R_100": "Volatility 100 Index",
         "R_50": "Volatility 50 Index",
         "R_25": "Volatility 25 Index",
@@ -581,6 +727,7 @@
         if (lastSignalAction !== "BUY") {
           playChime(true);
           appendSignalLog("BUY", currClose, tp, sl, quality, currRsi, reason);
+          sendTelegramAlert("BUY", currClose, tp, sl, quality, currRsi, reason);
         }
       } else if (action === "SELL") {
         banner.className = "bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl transition-all duration-300 neon-border-sell";
@@ -593,6 +740,7 @@
         if (lastSignalAction !== "SELL") {
           playChime(false);
           appendSignalLog("SELL", currClose, tp, sl, quality, currRsi, reason);
+          sendTelegramAlert("SELL", currClose, tp, sl, quality, currRsi, reason);
         }
       } else {
         banner.className = "bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl transition-all duration-300 neon-border-hold";
