@@ -445,6 +445,11 @@
 
     function changeSymbol(newSym) {
       currentSymbol = newSym;
+      candles = [];
+      document.getElementById("chartPrice").innerText = "Loading...";
+      document.getElementById("paramEntry").innerText = "---.--";
+      document.getElementById("paramTP").innerText = "---.--";
+      document.getElementById("paramSL").innerText = "---.--";
       const names = {
         "R_75": "Volatility 75 Index",
         "frxXAUUSD": "Gold vs US Dollar (XAU/USD)",
@@ -460,6 +465,7 @@
     function changeTimeframe(tf, gran) {
       currentTf = tf;
       currentGranularity = gran;
+      candles = [];
       document.querySelectorAll('.tf-btn').forEach(btn => {
         if (btn.dataset.tf === tf) {
           btn.className = "tf-btn px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold shadow transition";
